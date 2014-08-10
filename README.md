@@ -7,7 +7,7 @@
 
 # DropPod
 
-DropPod is a CLI for deploying a private GitHub repository to Heroku.
+DropPod is a CLI for deploying private GitHub repositories to Heroku.
 
 DropPod uses the [GitHub Contents API](https://developer.github.com/v3/repos/contents/#get-archive-link)
 to retrieve the application tarball. The tarball is pushed to S3 and a signed URL

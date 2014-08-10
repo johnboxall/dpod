@@ -7,7 +7,7 @@ DOWNLOAD_URL = (URL + "tarball/" + VERSION)
 
 setup(name="dpod",
       version=VERSION,
-      description="CLI for deploying a private GitHub repository to Heroku.",
+      description="CLI for deploying private GitHub repositories to Heroku.",
       long_description=open('README.md').read(),
       scripts=["dpod"],
       author="John Boxall",
