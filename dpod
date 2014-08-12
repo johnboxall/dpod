@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import collections
-import hashlib
-import importlib
-import itertools
 import json
 import netrc
 import os
@@ -11,10 +8,6 @@ import subprocess
 import time
 
 import requests
-
-import boto
-import boto.s3.key
-import boto.s3.lifecycle
 
 
 ###
@@ -44,66 +37,20 @@ def parse_github_remote_url(uri):
     repo, _ = repo.rsplit(".", 1)
     return user, repo
 
-def get_tarball_from_github(config):
+def get_tarball_url_from_github(config):
     '''
-    Returns an application tarball using the Contents API:
+    Returns the URL of an application tarball using the Contents API:
 
         https://developer.github.com/v3/repos/contents/#get-archive-link
 
     '''
     url = "https://api.github.com/repos/%s/%s/tarball/%s" % (config.user, config.repo, config.branch)
     session = requests.Session()
-    session.auth = ('token', config.token)
-    response = session.get(url)
+    session.auth = ("token", config.token)
+    response = session.get(url, allow_redirects=False)
     response.raise_for_status()
-    return response.content
-
-
-###
-# S3
-###
-
-S3Config = collections.namedtuple("S3Config", ["connection", "bucket", "key"])
-
-def get_s3_config():
-    '''
-    Returns an `S3Config` instance from the current environment variable settings.
-
-    '''
-    connection = boto.connect_s3()
-    bucket = "dpod-%s" % connection.gs_access_key_id.lower()
-    key = "app.tgz"
-    return S3Config(connection, bucket, key)
-
-def setup_s3(config):
-    '''
-    Creates an S3 bucket configured to automatically expire files.
-
-    '''
-    try:
-        bucket = config.connection.create_bucket(config.bucket)
-    except boto.exception.S3CreateError as err:
-        print err
-        return
-
-    lifecycle = boto.s3.lifecycle.Lifecycle()
-    lifecycle.add_rule(id="expire keys after one day",
-                       prefix="",
-                       status="Enabled",
-                       expiration=boto.s3.lifecycle.Expiration(days=1))
-
-    bucket.configure_lifecycle(lifecycle)
-
-def upload_to_s3(config, content):
-    '''
-    Uploads the string `content` to S3.
-
-    '''
-    bucket = config.connection.get_bucket(config.bucket, validate=False)
-    key = boto.s3.key.Key(bucket)
-    key.key = config.key
-    key.set_contents_from_string(content)
-    return key
+    tarball_url = response.headers["location"]
+    return tarball_url
 
 
 ###
@@ -163,15 +110,9 @@ def check_heroku_app_status(config, app_setup_id):
 
 def cli():
     github_config = get_github_config()
-    s3_config = get_s3_config()
     heroku_config = get_heroku_config()
 
-    setup_s3(s3_config)
-
-    tarball = get_tarball_from_github(github_config)
-    tarball_key = upload_to_s3(s3_config, tarball)
-    signed_tarball_url = tarball_key.generate_url(expires_in=60)
-
+    signed_tarball_url = get_tarball_url_from_github(github_config)
     app_name, app_setup_id = create_heroku_app(heroku_config, signed_tarball_url)
 
     while True:
